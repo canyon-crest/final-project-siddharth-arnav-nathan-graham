@@ -6,6 +6,7 @@ import texasholdem.model.Player;
 import texasholdem.view.ActionPanel;
 import texasholdem.view.PlayerView;
 import texasholdem.view.TableView;
+import texasholdem.view.GameView;
 
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
@@ -44,16 +45,21 @@ public class GameController {
     /** Delay before AI actions (milliseconds) */
     private static final int AI_ACTION_DELAY = 1000;
     
+    /** Game view */
+    private GameView gameView;
+    
     /**
      * Constructs a new game controller.
      * @param tableView the table view
      * @param actionPanel the action panel
      * @param playerViews the player views
+     * @param gameView the game view
      */
-    public GameController(TableView tableView, ActionPanel actionPanel, List<PlayerView> playerViews) {
+    public GameController(TableView tableView, ActionPanel actionPanel, List<PlayerView> playerViews, GameView gameView) {
         this.tableView = tableView;
         this.actionPanel = actionPanel;
         this.playerViews = playerViews;
+        this.gameView = gameView;
         
         // Set up AI timer
         aiTimer = new Timer(AI_ACTION_DELAY, new ActionListener() {
@@ -130,14 +136,23 @@ public class GameController {
             players.set(i, computerPlayer);
         }
         
+        // Reset player views to use the correct Player instances
+        if (gameView != null) {
+            gameView.resetPlayerViews(players);
+        }
+        
         // Update player views
         for (int i = 0; i < playerViews.size() && i < players.size(); i++) {
-            playerViews.get(i).setPlayer(players.get(i));
-            playerViews.get(i).setCards(players.get(i).getHoleCards(), i == 0);
-            playerViews.get(i).setFolded(false);
-            playerViews.get(i).setCurrentPlayer(false);
-            playerViews.get(i).setDealer(players.get(i).isDealer());
-            playerViews.get(i).updateView();
+            Player player = players.get(i);
+            PlayerView playerView = playerViews.get(i);
+            
+            // Reveal all cards at showdown
+            boolean showCards = (i == 0) || game.getCurrentRound() == Game.BettingRound.SHOWDOWN;
+            playerView.setCards(player.getHoleCards(), showCards);
+            playerView.setFolded(player.hasFolded());
+            playerView.setCurrentPlayer(player == game.getCurrentPlayer());
+            playerView.setDealer(player.isDealer());
+            playerView.updateView();
         }
         
         // Start the game
@@ -170,8 +185,9 @@ public class GameController {
             Player player = players.get(i);
             PlayerView playerView = playerViews.get(i);
             
-            // Update player state
-            playerView.setCards(player.getHoleCards(), i == 0 || game.getCurrentRound() == Game.BettingRound.SHOWDOWN);
+            // Reveal all cards at showdown
+            boolean showCards = (i == 0) || game.getCurrentRound() == Game.BettingRound.SHOWDOWN;
+            playerView.setCards(player.getHoleCards(), showCards);
             playerView.setFolded(player.hasFolded());
             playerView.setCurrentPlayer(player == currentPlayer);
             playerView.setDealer(player.isDealer());
@@ -357,9 +373,25 @@ public class GameController {
         
         // Schedule game reset after a delay
         Timer showdownTimer = new Timer(3000, e -> {
+            // Check for game over (only one player with chips left)
+            List<Player> players = game.getPlayers();
+            int playersWithChips = 0;
+            Player winner = null;
+            for (Player p : players) {
+                if (p.getChips() > 0) {
+                    playersWithChips++;
+                    winner = p;
+                }
+            }
+            if (playersWithChips == 1) {
+                // Game over
+                JOptionPane.showMessageDialog(tableView, winner.getName() + " wins the game!", "Game Over", JOptionPane.INFORMATION_MESSAGE);
+                actionPanel.setActionsEnabled(false);
+                return;
+            }
+            // Otherwise, start a new round
             game.startNewRound();
             updateGameView();
-            
             // If the next player is AI, trigger their action
             if (isCurrentPlayerAi()) {
                 aiTimer.start();

@@ -2,6 +2,7 @@ package texasholdem.view;
 
 import texasholdem.controller.GameController;
 import texasholdem.model.Player;
+import texasholdem.model.ComputerPlayer;
 
 import javax.swing.BorderFactory;
 import javax.swing.JFrame;
@@ -64,15 +65,15 @@ public class GameView extends JFrame {
         actionPanel = new ActionPanel();
         playerViews = new ArrayList<>();
         
-        // Create players panel
-        setupPlayersLayout();
+        // Create players panel and get the center panel
+        JPanel centerPanel = setupPlayersLayout();
         
         // Add main components to the frame
-        add(tableView, BorderLayout.CENTER);
+        add(centerPanel, BorderLayout.CENTER);
         add(actionPanel, BorderLayout.SOUTH);
         
         // Create game controller
-        controller = new GameController(tableView, actionPanel, playerViews);
+        controller = new GameController(tableView, actionPanel, playerViews, this);
         
         // Set default size and make visible
         setSize(1000, 700);
@@ -83,7 +84,7 @@ public class GameView extends JFrame {
     /**
      * Sets up the player layout around the table.
      */
-    private void setupPlayersLayout() {
+    private JPanel setupPlayersLayout() {
         // Create player panels
         topPlayersPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
         topPlayersPanel.setOpaque(false);
@@ -130,7 +131,7 @@ public class GameView extends JFrame {
         centerPanel.add(rightPlayersPanel, BorderLayout.EAST);
         centerPanel.add(bottomPlayerPanel, BorderLayout.SOUTH);
         
-        add(centerPanel, BorderLayout.CENTER);
+        return centerPanel;
     }
     
     /**
@@ -140,5 +141,50 @@ public class GameView extends JFrame {
         SwingUtilities.invokeLater(() -> {
             new GameView();
         });
+    }
+
+    // Add this method to allow resetting player views and panels
+    public void resetPlayerViews(List<Player> players) {
+        // Remove all player views from panels
+        topPlayersPanel.removeAll();
+        leftPlayersPanel.removeAll();
+        rightPlayersPanel.removeAll();
+        bottomPlayerPanel.removeAll();
+        playerViews.clear();
+
+        // Human player (bottom)
+        PlayerView humanPlayerView = new PlayerView(players.get(0));
+        playerViews.add(humanPlayerView);
+        bottomPlayerPanel.add(humanPlayerView);
+
+        // AI players (top, left, right)
+        for (int i = 1; i < players.size(); i++) {
+            Player p = players.get(i);
+            PlayerView aiPlayerView;
+            if (!(p instanceof ComputerPlayer)) {
+                int aggressiveness = 40 + (int)(Math.random() * 40);
+                int tightness = 30 + (int)(Math.random() * 40);
+                p = new ComputerPlayer(p.getName(), p.getChips(), aggressiveness, tightness);
+                players.set(i, p);
+            }
+            aiPlayerView = new PlayerView(p);
+            playerViews.add(aiPlayerView);
+            if (i <= 2) {
+                topPlayersPanel.add(aiPlayerView);
+            } else if (i <= 4) {
+                leftPlayersPanel.add(aiPlayerView);
+            } else {
+                rightPlayersPanel.add(aiPlayerView);
+            }
+        }
+        // Refresh the layout
+        topPlayersPanel.revalidate();
+        leftPlayersPanel.revalidate();
+        rightPlayersPanel.revalidate();
+        bottomPlayerPanel.revalidate();
+        topPlayersPanel.repaint();
+        leftPlayersPanel.repaint();
+        rightPlayersPanel.repaint();
+        bottomPlayerPanel.repaint();
     }
 } 
