@@ -242,20 +242,16 @@ public class Game {
         }
         
         // Take chips from player and add to pot
-        if (currentPlayer.removeChips(amountToCall)) {
-            pot += amountToCall;
-            currentPlayer.setCurrentBet(currentPlayer.getCurrentBet() + amountToCall);
-            
-            // Move to next player
-            advanceToNextPlayer();
-            
-            // Check if betting round is over
-            checkEndOfBettingRound();
-            
-            return true;
-        }
+        currentPlayer.removeChips(amountToCall);
+        pot += amountToCall;
+        currentPlayer.setCurrentBet(currentPlayer.getCurrentBet() + amountToCall);
+        // Move to next player
+        advanceToNextPlayer();
         
-        return false;
+        // Check if betting round is over
+        checkEndOfBettingRound();
+        
+        return true;
     }
     
     /**
