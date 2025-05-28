@@ -1,18 +1,15 @@
 package texasholdem.controller;
 
-import texasholdem.model.ComputerPlayer;
 import texasholdem.model.Game;
 import texasholdem.model.Player;
+import texasholdem.model.ComputerPlayer;
 import texasholdem.view.ActionPanel;
 import texasholdem.view.PlayerView;
 import texasholdem.view.TableView;
 import texasholdem.view.GameView;
+import texasholdem.model.HandEvaluator;
 
 import javax.swing.JOptionPane;
-import javax.swing.SwingUtilities;
-import javax.swing.Timer;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,17 +30,11 @@ public class GameController {
     /** The player views */
     private List<PlayerView> playerViews;
     
-    /** Timer for AI player actions */
-    private Timer aiTimer;
-    
     /** Default starting chips */
     private static final int DEFAULT_STARTING_CHIPS = 1000;
     
     /** Default minimum bet */
     private static final int DEFAULT_MIN_BET = 10;
-    
-    /** Delay before AI actions (milliseconds) */
-    private static final int AI_ACTION_DELAY = 1000;
     
     /** Game view */
     private GameView gameView;
@@ -60,15 +51,6 @@ public class GameController {
         this.actionPanel = actionPanel;
         this.playerViews = playerViews;
         this.gameView = gameView;
-        
-        // Set up AI timer
-        aiTimer = new Timer(AI_ACTION_DELAY, new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                handleAiAction();
-            }
-        });
-        aiTimer.setRepeats(false);
         
         // Add action listeners
         setupActionListeners();
@@ -92,61 +74,25 @@ public class GameController {
      * Creates a new game with the default settings.
      */
     public void createNewGame() {
-        // Stop any pending AI actions
-        aiTimer.stop();
-        
-        // Create players - first player is human, others are AI
-        List<String> playerNames = new ArrayList<>();
-        for (PlayerView playerView : playerViews) {
-            Player player = playerView.getPlayer();
-            if (player != null) {
-                playerNames.add(player.getName());
-            }
-        }
-        
-        // If no existing players, create default names
-        if (playerNames.isEmpty()) {
-            playerNames.add("Player");
-            playerNames.add("Computer 1");
-            playerNames.add("Computer 2");
-            playerNames.add("Computer 3");
-        }
-        
-        // Create new game
-        String[] nameArray = playerNames.toArray(new String[0]);
-        game = new Game(nameArray, DEFAULT_STARTING_CHIPS, DEFAULT_MIN_BET);
-        
-        // Replace computer players with ComputerPlayer instances
-        List<Player> players = game.getPlayers();
-        for (int i = 1; i < players.size(); i++) {
-            Player oldPlayer = players.get(i);
-            // Create computer player with random personality
-            int aggressiveness = 40 + (int)(Math.random() * 40); // 40-80
-            int tightness = 30 + (int)(Math.random() * 40); // 30-70
-            ComputerPlayer computerPlayer = new ComputerPlayer(
-                oldPlayer.getName(), 
-                oldPlayer.getChips(),
-                aggressiveness,
-                tightness
-            );
-            // Copy state from old player
-            computerPlayer.setCurrentBet(oldPlayer.getCurrentBet());
-            computerPlayer.setFolded(oldPlayer.hasFolded());
-            computerPlayer.setDealer(oldPlayer.isDealer());
-            players.set(i, computerPlayer);
-        }
-        
+        // Create players - first is human, second is AI
+        List<Player> players = new ArrayList<>();
+        Player humanPlayer = new Player("Player 1", DEFAULT_STARTING_CHIPS);
+        ComputerPlayer aiPlayer = new ComputerPlayer("AI Bot", DEFAULT_STARTING_CHIPS, 60, 50);
+        players.add(humanPlayer);
+        players.add(aiPlayer);
+        game = new Game(new String[] { humanPlayer.getName(), aiPlayer.getName() }, DEFAULT_STARTING_CHIPS, DEFAULT_MIN_BET);
+        // Replace the second player in the game with the ComputerPlayer instance
+        List<Player> gamePlayers = game.getPlayers();
+        gamePlayers.set(1, aiPlayer);
         // Reset player views to use the correct Player instances
         if (gameView != null) {
-            gameView.resetPlayerViews(players);
+            gameView.resetPlayerViews(gamePlayers);
         }
-        
         // Update player views
-        for (int i = 0; i < playerViews.size() && i < players.size(); i++) {
-            Player player = players.get(i);
+        for (int i = 0; i < playerViews.size() && i < gamePlayers.size(); i++) {
+            Player player = gamePlayers.get(i);
             PlayerView playerView = playerViews.get(i);
-            
-            // Reveal all cards at showdown
+            // Show cards for human, hide for AI unless showdown
             boolean showCards = (i == 0) || game.getCurrentRound() == Game.BettingRound.SHOWDOWN;
             playerView.setCards(player.getHoleCards(), showCards);
             playerView.setFolded(player.hasFolded());
@@ -154,14 +100,12 @@ public class GameController {
             playerView.setDealer(player.isDealer());
             playerView.updateView();
         }
-        
         // Start the game
         game.startNewRound();
         updateGameView();
-        
-        // If the current player is AI, trigger their action
-        if (isCurrentPlayerAi()) {
-            aiTimer.start();
+        // If AI's turn, make AI move
+        if (game.getCurrentPlayer() instanceof ComputerPlayer) {
+            handleAiTurn();
         }
     }
     
@@ -185,7 +129,7 @@ public class GameController {
             Player player = players.get(i);
             PlayerView playerView = playerViews.get(i);
             
-            // Reveal all cards at showdown
+            // Show cards for human, hide for AI unless showdown
             boolean showCards = (i == 0) || game.getCurrentRound() == Game.BettingRound.SHOWDOWN;
             playerView.setCards(player.getHoleCards(), showCards);
             playerView.setFolded(player.hasFolded());
@@ -196,8 +140,8 @@ public class GameController {
         
         // Update action panel
         int maxBet = game.getMaxBet();
-        Player humanPlayer = players.get(0);
-        int callAmount = maxBet - humanPlayer.getCurrentBet();
+        Player currentHumanPlayer = currentPlayer;
+        int callAmount = maxBet - currentHumanPlayer.getCurrentBet();
         
         boolean canCheck = callAmount == 0;
         boolean hasBet = maxBet > 0;
@@ -209,16 +153,27 @@ public class GameController {
         
         // Set bet slider limits
         int minBetAmount = Math.max(DEFAULT_MIN_BET, maxBet * 2);
-        int maxBetAmount = humanPlayer.getChips();
+        int maxBetAmount = currentHumanPlayer.getChips();
         actionPanel.setBetLimits(minBetAmount, maxBetAmount);
         
-        // Enable actions if it's the human player's turn
-        boolean isHumanTurn = currentPlayer == humanPlayer && !humanPlayer.hasFolded();
-        actionPanel.setActionsEnabled(isHumanTurn);
+        // Enable actions if it's the current player's turn and they haven't folded
+        boolean isCurrentPlayerTurn = !currentHumanPlayer.hasFolded();
+        actionPanel.setActionsEnabled(isCurrentPlayerTurn);
         
         // Check for end of round
         if (game.getCurrentRound() == Game.BettingRound.SHOWDOWN) {
             handleShowdown();
+        }
+        
+        // If it's AI's turn, show 'AI is thinking...' and delay before AI acts
+        if (game.getCurrentPlayer() instanceof ComputerPlayer && game.getCurrentRound() != Game.BettingRound.SHOWDOWN) {
+            if (gameView != null) gameView.setStatusMessage("AI is thinking...");
+            javax.swing.Timer timer = new javax.swing.Timer(900, e -> handleAiTurn());
+            timer.setRepeats(false);
+            timer.start();
+            return;
+        } else {
+            if (gameView != null) gameView.setStatusMessage(""); // Clear status for human
         }
     }
     
@@ -242,11 +197,6 @@ public class GameController {
     private void handleFold() {
         game.fold();
         updateGameView();
-        
-        // If the next player is AI, trigger their action
-        if (isCurrentPlayerAi()) {
-            aiTimer.start();
-        }
     }
     
     /**
@@ -255,11 +205,6 @@ public class GameController {
     private void handleCheck() {
         game.check();
         updateGameView();
-        
-        // If the next player is AI, trigger their action
-        if (isCurrentPlayerAi()) {
-            aiTimer.start();
-        }
     }
     
     /**
@@ -268,145 +213,122 @@ public class GameController {
     private void handleCall() {
         game.call();
         updateGameView();
-        
-        // If the next player is AI, trigger their action
-        if (isCurrentPlayerAi()) {
-            aiTimer.start();
-        }
     }
     
     /**
-     * Handles a bet/raise action.
+     * Handles a bet action.
      */
     private void handleBet() {
-        int betAmount = actionPanel.getBetAmount();
-        int maxBet = game.getMaxBet();
-        
-        if (maxBet > 0) {
-            // Raise
-            game.raise(betAmount);
-        } else {
-            // Bet
-            game.bet(betAmount);
+        // Only perform bet/raise if ActionPanel is awaiting bet amount (i.e., after Confirm is pressed)
+        if (!actionPanel.isAwaitingBetAmount()) {
+            // Do nothing; ActionPanel will show the text field
+            return;
         }
-        
-        updateGameView();
-        
-        // If the next player is AI, trigger their action
-        if (isCurrentPlayerAi()) {
-            aiTimer.start();
-        }
-    }
-    
-    /**
-     * Handles an AI player's action.
-     */
-    private void handleAiAction() {
-        Player currentPlayer = game.getCurrentPlayer();
-        
-        if (currentPlayer instanceof ComputerPlayer) {
-            ComputerPlayer ai = (ComputerPlayer) currentPlayer;
-            
-            // Get game state
-            int maxBet = game.getMaxBet();
-            int potSize = game.getPot();
-            int callAmount = maxBet - ai.getCurrentBet();
-            
-            // Decide action
-            String action = ai.decideAction(
-                game, 
-                game.getCommunityCards(), 
-                maxBet, 
-                DEFAULT_MIN_BET, 
-                potSize
-            );
-            
-            // Execute action
-            switch (action) {
-                case "fold":
-                    game.fold();
-                    break;
-                case "check":
-                    game.check();
-                    break;
-                case "call":
-                    game.call();
-                    break;
-                case "bet":
-                    int betAmount = ai.decideBetAmount(
-                        game, 
-                        0.5, // Medium hand strength 
-                        potSize, 
-                        DEFAULT_MIN_BET, 
-                        maxBet
-                    );
-                    game.bet(betAmount);
-                    break;
-                case "raise":
-                    int raiseAmount = ai.decideBetAmount(
-                        game, 
-                        0.7, // Stronger hand strength 
-                        potSize, 
-                        DEFAULT_MIN_BET, 
-                        maxBet
-                    );
-                    game.raise(raiseAmount);
-                    break;
+        int amount = actionPanel.getBetAmount();
+        if (amount > 0) {
+            if (game.getMaxBet() == 0) {
+                game.bet(amount);
+            } else {
+                game.raise(amount);
             }
-            
-            // Update view
             updateGameView();
-            
-            // If still AI turn, schedule next action
-            if (isCurrentPlayerAi()) {
-                aiTimer.start();
-            }
+        } else {
+            JOptionPane.showMessageDialog(gameView, "Please enter a valid bet amount between the minimum and maximum.", "Invalid Bet", JOptionPane.ERROR_MESSAGE);
         }
     }
     
     /**
-     * Handles the showdown (end of round).
+     * Handles the showdown phase.
      */
     private void handleShowdown() {
-        // Disable actions during showdown
-        actionPanel.setActionsEnabled(false);
-        
-        // Schedule game reset after a delay
-        Timer showdownTimer = new Timer(3000, e -> {
-            // Check for game over (only one player with chips left)
-            List<Player> players = game.getPlayers();
-            int playersWithChips = 0;
-            Player winner = null;
-            for (Player p : players) {
-                if (p.getChips() > 0) {
-                    playersWithChips++;
-                    winner = p;
-                }
-            }
-            if (playersWithChips == 1) {
-                // Game over
-                JOptionPane.showMessageDialog(tableView, winner.getName() + " wins the game!", "Game Over", JOptionPane.INFORMATION_MESSAGE);
-                actionPanel.setActionsEnabled(false);
-                return;
-            }
-            // Otherwise, start a new round
-            game.startNewRound();
-            updateGameView();
-            // If the next player is AI, trigger their action
-            if (isCurrentPlayerAi()) {
-                aiTimer.start();
-            }
-        });
-        showdownTimer.setRepeats(false);
-        showdownTimer.start();
+        // Capture the pot amount BEFORE the winner is awarded the pot and the pot is reset
+        int potAmount = game.getLastPotWon();
+
+        // Show all cards
+        for (int i = 0; i < playerViews.size() && i < game.getPlayers().size(); i++) {
+            Player player = game.getPlayers().get(i);
+            PlayerView playerView = playerViews.get(i);
+            playerView.setCards(player.getHoleCards(), true);
+            playerView.updateView();
+        }
+
+        // Evaluate hands and determine winner
+        java.util.List<Player> players = game.getPlayers();
+        Player player1 = players.get(0);
+        Player player2 = players.get(1);
+        HandEvaluator.HandResult hand1 = HandEvaluator.evaluateHand(player1.getHoleCards(), game.getCommunityCards());
+        HandEvaluator.HandResult hand2 = HandEvaluator.evaluateHand(player2.getHoleCards(), game.getCommunityCards());
+        int comparison = HandEvaluator.compareHands(hand1, hand2);
+        String winnerName;
+        if (player1.hasFolded()) {
+            winnerName = player2.getName();
+        } else if (player2.hasFolded()) {
+            winnerName = player1.getName();
+        } else if (comparison > 0) {
+            winnerName = player1.getName();
+        } else if (comparison < 0) {
+            winnerName = player2.getName();
+        } else {
+            winnerName = "It's a tie!";
+        }
+
+        // Build showdown message
+        StringBuilder message = new StringBuilder();
+        message.append("Showdown!\n\n");
+        message.append(player1.getName()).append("'s hand: ").append(hand1.getRank()).append("\n");
+        message.append(player2.getName()).append("'s hand: ").append(hand2.getRank()).append("\n\n");
+        if (!winnerName.equals("It's a tie!")) {
+            message.append("Winner: ").append(winnerName).append("\n");
+            message.append("Pot won: $").append(potAmount).append("\n");
+        } else {
+            message.append("It's a tie! Pot is split.\n");
+        }
+
+        JOptionPane.showMessageDialog(gameView, message.toString(), "Showdown", JOptionPane.INFORMATION_MESSAGE);
+
+        // Start new round
+        game.startNewRound();
+        updateGameView();
     }
-    
-    /**
-     * Checks if the current player is an AI player.
-     * @return true if the current player is AI, false otherwise
-     */
-    private boolean isCurrentPlayerAi() {
-        Player currentPlayer = game.getCurrentPlayer();
-        return currentPlayer instanceof ComputerPlayer;
+
+    private void handleAiTurn() {
+        ComputerPlayer ai = (ComputerPlayer) game.getCurrentPlayer();
+        int maxBet = game.getMaxBet();
+        int minBet = DEFAULT_MIN_BET;
+        int potSize = game.getPot();
+        String action = ai.decideAction(game, game.getCommunityCards(), maxBet, minBet, potSize);
+        String message = "";
+        switch (action) {
+            case "fold":
+                game.fold();
+                message = ai.getName() + " folds.";
+                break;
+            case "check":
+                game.check();
+                message = ai.getName() + " checks.";
+                break;
+            case "call":
+                game.call();
+                message = ai.getName() + " calls.";
+                break;
+            case "bet":
+                int betAmount = ai.decideBetAmount(game, 0.5, potSize, minBet, ai.getChips());
+                game.bet(betAmount);
+                message = ai.getName() + " bets $" + betAmount + ".";
+                break;
+            case "raise":
+                int raiseAmount = ai.decideBetAmount(game, 0.7, potSize, minBet, ai.getChips());
+                game.raise(raiseAmount);
+                message = ai.getName() + " raises $" + raiseAmount + ".";
+                break;
+        }
+        if (gameView != null) gameView.setStatusMessage(message);
+        updateGameView();
+        // If still AI's turn, repeat (with delay)
+        if (game.getCurrentPlayer() instanceof ComputerPlayer && game.getCurrentRound() != Game.BettingRound.SHOWDOWN) {
+            javax.swing.Timer timer = new javax.swing.Timer(900, e -> handleAiTurn());
+            timer.setRepeats(false);
+            timer.start();
+        }
     }
 } 

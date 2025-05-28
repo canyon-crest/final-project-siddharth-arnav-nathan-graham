@@ -2,19 +2,24 @@ package texasholdem.view;
 
 import texasholdem.controller.GameController;
 import texasholdem.model.Player;
-import texasholdem.model.ComputerPlayer;
 
 import javax.swing.BorderFactory;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
+import javax.swing.JLabel;
 import javax.swing.SwingUtilities;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.SwingConstants;
 
 /**
  * The main game view that ties all GUI components together.
@@ -32,17 +37,14 @@ public class GameView extends JFrame {
     /** The game controller */
     private GameController controller;
     
-    /** Panel for players on top */
-    private JPanel topPlayersPanel;
+    /** Panel for player 1 */
+    private JPanel player1Panel;
     
-    /** Panel for players on left */
-    private JPanel leftPlayersPanel;
+    /** Panel for player 2 */
+    private JPanel player2Panel;
     
-    /** Panel for players on right */
-    private JPanel rightPlayersPanel;
-    
-    /** Panel for the human player */
-    private JPanel bottomPlayerPanel;
+    /** Status label */
+    private JLabel statusLabel;
     
     /**
      * Constructs a new game view.
@@ -72,6 +74,11 @@ public class GameView extends JFrame {
         add(centerPanel, BorderLayout.CENTER);
         add(actionPanel, BorderLayout.SOUTH);
         
+        // Add status label at the bottom
+        statusLabel = new JLabel(" ", SwingConstants.CENTER);
+        statusLabel.setFont(new Font("SansSerif", Font.ITALIC, 14));
+        add(statusLabel, BorderLayout.NORTH);
+        
         // Create game controller
         controller = new GameController(tableView, actionPanel, playerViews, this);
         
@@ -86,50 +93,33 @@ public class GameView extends JFrame {
      */
     private JPanel setupPlayersLayout() {
         // Create player panels
-        topPlayersPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
-        topPlayersPanel.setOpaque(false);
+        player1Panel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        player1Panel.setOpaque(false);
         
-        leftPlayersPanel = new JPanel(new GridLayout(2, 1, 0, 10));
-        leftPlayersPanel.setOpaque(false);
-        
-        rightPlayersPanel = new JPanel(new GridLayout(2, 1, 0, 10));
-        rightPlayersPanel.setOpaque(false);
-        
-        bottomPlayerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        bottomPlayerPanel.setOpaque(false);
+        player2Panel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        player2Panel.setOpaque(false);
         
         // Create player views
         playerViews = new ArrayList<>();
         
-        // Human player (bottom)
-        Player humanPlayer = new Player("Player", 1000);
-        PlayerView humanPlayerView = new PlayerView(humanPlayer);
-        playerViews.add(humanPlayerView);
-        bottomPlayerPanel.add(humanPlayerView);
+        // Player 1 (top)
+        Player player1 = new Player("Player 1", 1000);
+        PlayerView player1View = new PlayerView(player1);
+        playerViews.add(player1View);
+        player1Panel.add(player1View);
         
-        // AI players (top, left, right)
-        for (int i = 1; i <= 5; i++) {
-            Player aiPlayer = new Player("Computer " + i, 1000);
-            PlayerView aiPlayerView = new PlayerView(aiPlayer);
-            playerViews.add(aiPlayerView);
-            
-            if (i <= 2) {
-                topPlayersPanel.add(aiPlayerView);
-            } else if (i <= 4) {
-                leftPlayersPanel.add(aiPlayerView);
-            } else {
-                rightPlayersPanel.add(aiPlayerView);
-            }
-        }
+        // Player 2 (bottom)
+        Player player2 = new Player("Player 2", 1000);
+        PlayerView player2View = new PlayerView(player2);
+        playerViews.add(player2View);
+        player2Panel.add(player2View);
         
         // Add player panels to the main layout
         JPanel centerPanel = new JPanel(new BorderLayout());
         centerPanel.setOpaque(false);
-        centerPanel.add(topPlayersPanel, BorderLayout.NORTH);
-        centerPanel.add(leftPlayersPanel, BorderLayout.WEST);
+        centerPanel.add(player1Panel, BorderLayout.NORTH);
         centerPanel.add(tableView, BorderLayout.CENTER);
-        centerPanel.add(rightPlayersPanel, BorderLayout.EAST);
-        centerPanel.add(bottomPlayerPanel, BorderLayout.SOUTH);
+        centerPanel.add(player2Panel, BorderLayout.SOUTH);
         
         return centerPanel;
     }
@@ -143,48 +133,38 @@ public class GameView extends JFrame {
         });
     }
 
-    // Add this method to allow resetting player views and panels
+    /**
+     * Resets the player views with new player instances.
+     * @param players the list of players
+     */
     public void resetPlayerViews(List<Player> players) {
         // Remove all player views from panels
-        topPlayersPanel.removeAll();
-        leftPlayersPanel.removeAll();
-        rightPlayersPanel.removeAll();
-        bottomPlayerPanel.removeAll();
+        player1Panel.removeAll();
+        player2Panel.removeAll();
         playerViews.clear();
 
-        // Human player (bottom)
-        PlayerView humanPlayerView = new PlayerView(players.get(0));
-        playerViews.add(humanPlayerView);
-        bottomPlayerPanel.add(humanPlayerView);
+        // Player 1 (top)
+        PlayerView player1View = new PlayerView(players.get(0));
+        playerViews.add(player1View);
+        player1Panel.add(player1View);
 
-        // AI players (top, left, right)
-        for (int i = 1; i < players.size(); i++) {
-            Player p = players.get(i);
-            PlayerView aiPlayerView;
-            if (!(p instanceof ComputerPlayer)) {
-                int aggressiveness = 40 + (int)(Math.random() * 40);
-                int tightness = 30 + (int)(Math.random() * 40);
-                p = new ComputerPlayer(p.getName(), p.getChips(), aggressiveness, tightness);
-                players.set(i, p);
-            }
-            aiPlayerView = new PlayerView(p);
-            playerViews.add(aiPlayerView);
-            if (i <= 2) {
-                topPlayersPanel.add(aiPlayerView);
-            } else if (i <= 4) {
-                leftPlayersPanel.add(aiPlayerView);
-            } else {
-                rightPlayersPanel.add(aiPlayerView);
-            }
-        }
+        // Player 2 (bottom)
+        PlayerView player2View = new PlayerView(players.get(1));
+        playerViews.add(player2View);
+        player2Panel.add(player2View);
+
         // Refresh the layout
-        topPlayersPanel.revalidate();
-        leftPlayersPanel.revalidate();
-        rightPlayersPanel.revalidate();
-        bottomPlayerPanel.revalidate();
-        topPlayersPanel.repaint();
-        leftPlayersPanel.repaint();
-        rightPlayersPanel.repaint();
-        bottomPlayerPanel.repaint();
+        player1Panel.revalidate();
+        player2Panel.revalidate();
+        player1Panel.repaint();
+        player2Panel.repaint();
+    }
+
+    /**
+     * Updates the status message.
+     * @param msg the new status message
+     */
+    public void setStatusMessage(String msg) {
+        statusLabel.setText(msg);
     }
 } 

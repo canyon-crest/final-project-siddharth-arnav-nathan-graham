@@ -37,6 +37,9 @@ public class Game {
     /** The amount of the last raise */
     private int lastRaiseAmount;
     
+    /** The amount of the last pot won (for display in showdown) */
+    private int lastPotWon = 0;
+    
     /**
      * Enumeration representing the different betting rounds in Texas Holdem.
      */
@@ -45,24 +48,29 @@ public class Game {
     }
     
     /**
-     * Constructs a new game with the specified players and starting chips.
-     * @param playerNames the names of the players
+     * Constructs a new game with exactly two players and starting chips.
+     * @param playerNames the names of the two players
      * @param startingChips the number of chips each player starts with
      * @param minBet the minimum bet amount (big blind)
+     * @throws IllegalArgumentException if number of players is not exactly 2
      */
     public Game(String[] playerNames, int startingChips, int minBet) {
+        if (playerNames.length != 2) {
+            throw new IllegalArgumentException("Game must have exactly 2 players");
+        }
+        
         this.deck = new Deck();
         this.players = new ArrayList<>();
         this.communityCards = new ArrayList<>();
         this.minBet = minBet;
         
-        // Create players
+        // Create two players
         for (String name : playerNames) {
             players.add(new Player(name, startingChips));
         }
         
         // Start with a random dealer
-        this.dealerIndex = (int) (Math.random() * players.size());
+        this.dealerIndex = (int) (Math.random() * 2);
         
         // Initialize game state
         resetRound();
@@ -139,10 +147,10 @@ public class Game {
      */
     private void postBlinds() {
         // Small blind is the player after the dealer
-        int smallBlindIndex = (dealerIndex + 1) % players.size();
+        int smallBlindIndex = (dealerIndex + 1) % 2;
         
         // Big blind is the player after the small blind
-        int bigBlindIndex = (dealerIndex + 2) % players.size();
+        int bigBlindIndex = (dealerIndex + 2) % 2;
         
         // Post small blind (half of minimum bet)
         Player smallBlindPlayer = players.get(smallBlindIndex);
@@ -471,6 +479,7 @@ public class Game {
         if (getActivePlayerCount() == 1) {
             for (Player player : players) {
                 if (!player.hasFolded()) {
+                    lastPotWon = pot;
                     player.addChips(pot);
                     pot = 0;
                     return;
@@ -496,6 +505,7 @@ public class Game {
         
         // Award the pot to the winner
         if (winner != null) {
+            lastPotWon = pot;
             winner.addChips(pot);
             pot = 0;
         }
@@ -567,5 +577,12 @@ public class Game {
      */
     public List<Player> getPlayers() {
         return new ArrayList<>(players);
+    }
+    
+    /**
+     * Gets the amount of the last pot won (for display in showdown).
+     */
+    public int getLastPotWon() {
+        return lastPotWon;
     }
 } 

@@ -1,21 +1,14 @@
 package texasholdem.view;
 
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JSlider;
-import javax.swing.SwingConstants;
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import java.awt.*;
 import java.awt.event.ActionListener;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 
 /**
- * A panel that displays the action buttons and bet slider for the player.
+ * A panel that displays the action buttons and bet input for the player.
  */
 public class ActionPanel extends JPanel {
     /** Button for checking */
@@ -33,16 +26,13 @@ public class ActionPanel extends JPanel {
     /** Button for starting a new game */
     private JButton newGameButton;
     
-    /** Slider for selecting bet amount */
-    private JSlider betSlider;
-    
-    /** Label showing the current bet amount */
-    private JLabel betAmountLabel;
+    /** Text field for entering bet amount */
+    private JTextField betTextField;
     
     /** Panel containing the action buttons */
     private JPanel buttonsPanel;
     
-    /** Panel containing the bet controls */
+    /** Panel containing the bet input */
     private JPanel betPanel;
     
     /** The minimum bet amount */
@@ -51,18 +41,19 @@ public class ActionPanel extends JPanel {
     /** The maximum bet amount */
     private int maxBet;
     
-    /** The current bet amount */
-    private int currentBet;
-    
     /** Whether the game actions are enabled */
     private boolean actionsEnabled;
+    
+    private boolean isAwaitingBetAmount = false;
+    private ActionListener betListener;
+    private String lastBetButtonText = "Bet";
     
     /**
      * Constructs a new action panel.
      */
     public ActionPanel() {
         setLayout(new BorderLayout(5, 5));
-        setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        setBorder(new EmptyBorder(5, 5, 5, 5));
         setPreferredSize(new Dimension(600, 100));
         
         // Create buttons panel
@@ -84,33 +75,44 @@ public class ActionPanel extends JPanel {
         
         // Create bet panel
         betPanel = new JPanel(new BorderLayout(5, 5));
+        betPanel.setVisible(false); // Initially hidden
         
-        minBet = 10;
-        maxBet = 100;
-        currentBet = minBet;
+        // Create bet input field
+        betTextField = new JTextField();
+        betTextField.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        betTextField.setHorizontalAlignment(SwingConstants.CENTER);
         
-        betSlider = new JSlider(JSlider.HORIZONTAL, minBet, maxBet, currentBet);
-        betSlider.setMajorTickSpacing(maxBet / 5);
-        betSlider.setMinorTickSpacing(maxBet / 10);
-        betSlider.setPaintTicks(true);
-        betSlider.setPaintLabels(true);
-        
-        betSlider.addChangeListener(e -> {
-            currentBet = betSlider.getValue();
-            updateBetAmountLabel();
+        // Add placeholder text
+        betTextField.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                if (betTextField.getText().equals("Enter bet amount...")) {
+                    betTextField.setText("");
+                    betTextField.setForeground(Color.BLACK);
+                }
+            }
+            
+            @Override
+            public void focusLost(FocusEvent e) {
+                if (betTextField.getText().isEmpty()) {
+                    betTextField.setText("Enter bet amount...");
+                    betTextField.setForeground(Color.GRAY);
+                }
+            }
         });
         
-        betAmountLabel = new JLabel("Bet: $" + currentBet);
-        betAmountLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
-        betAmountLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        // Set initial placeholder
+        betTextField.setText("Enter bet amount...");
+        betTextField.setForeground(Color.GRAY);
         
-        betPanel.add(betSlider, BorderLayout.CENTER);
-        betPanel.add(betAmountLabel, BorderLayout.SOUTH);
+        betPanel.add(betTextField, BorderLayout.CENTER);
         
         add(betPanel, BorderLayout.CENTER);
         
         // Initially disable game actions
         setActionsEnabled(false);
+        
+        betButton.addActionListener(e -> onBetButtonPressed());
     }
     
     /**
@@ -126,43 +128,33 @@ public class ActionPanel extends JPanel {
     }
     
     /**
-     * Updates the bet amount label to show the current bet.
-     */
-    private void updateBetAmountLabel() {
-        betAmountLabel.setText("Bet: $" + currentBet);
-    }
-    
-    /**
-     * Sets the minimum and maximum bet amount, and updates the slider.
+     * Sets the minimum and maximum bet amount.
      * @param minBet the minimum bet
      * @param maxBet the maximum bet
      */
     public void setBetLimits(int minBet, int maxBet) {
         this.minBet = Math.max(1, minBet);
         this.maxBet = Math.max(this.minBet, maxBet);
-        
-        betSlider.setMinimum(this.minBet);
-        betSlider.setMaximum(this.maxBet);
-        
-        // Update tick spacing
-        int range = this.maxBet - this.minBet;
-        betSlider.setMajorTickSpacing(Math.max(1, range / 5));
-        betSlider.setMinorTickSpacing(Math.max(1, range / 10));
-        
-        // Set current bet to minimum if needed
-        if (currentBet < this.minBet) {
-            currentBet = this.minBet;
-            betSlider.setValue(currentBet);
-            updateBetAmountLabel();
-        }
     }
     
     /**
-     * Gets the current bet amount from the slider.
-     * @return the bet amount
+     * Gets the current bet amount from the text field.
+     * @return the bet amount, or -1 if invalid
      */
     public int getBetAmount() {
-        return currentBet;
+        try {
+            String text = betTextField.getText();
+            if (text.equals("Enter bet amount...")) {
+                return -1;
+            }
+            int amount = Integer.parseInt(text);
+            if (amount >= minBet && amount <= maxBet) {
+                return amount;
+            }
+            return -1;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
     
     /**
@@ -175,7 +167,7 @@ public class ActionPanel extends JPanel {
         checkButton.setEnabled(enabled);
         callButton.setEnabled(enabled);
         betButton.setEnabled(enabled);
-        betSlider.setEnabled(enabled);
+        betTextField.setEnabled(enabled);
     }
     
     /**
@@ -200,7 +192,7 @@ public class ActionPanel extends JPanel {
      */
     public void setBetEnabled(boolean enabled) {
         betButton.setEnabled(actionsEnabled && enabled);
-        betSlider.setEnabled(actionsEnabled && enabled);
+        betTextField.setEnabled(actionsEnabled && enabled);
     }
     
     /**
@@ -216,11 +208,16 @@ public class ActionPanel extends JPanel {
     }
     
     /**
-     * Sets the text on the bet button.
+     * Sets the text on the bet button and shows/hides the bet input field.
      * @param hasBet true if the bet button should show "Raise", false for "Bet"
      */
     public void setBetButtonText(boolean hasBet) {
-        betButton.setText(hasBet ? "Raise" : "Bet");
+        lastBetButtonText = hasBet ? "Raise" : "Bet";
+        if (!isAwaitingBetAmount) {
+            betButton.setText(lastBetButtonText);
+        }
+        // Only show the text field if awaiting input
+        betPanel.setVisible(isAwaitingBetAmount);
     }
     
     /**
@@ -252,7 +249,7 @@ public class ActionPanel extends JPanel {
      * @param listener the action listener
      */
     public void addBetListener(ActionListener listener) {
-        betButton.addActionListener(listener);
+        this.betListener = listener;
     }
     
     /**
@@ -261,5 +258,28 @@ public class ActionPanel extends JPanel {
      */
     public void addNewGameListener(ActionListener listener) {
         newGameButton.addActionListener(listener);
+    }
+    
+    private void onBetButtonPressed() {
+        if (!isAwaitingBetAmount) {
+            // First press: show text field, change button to Confirm
+            isAwaitingBetAmount = true;
+            betPanel.setVisible(true);
+            betButton.setText("Confirm");
+            betTextField.setText("");
+            betTextField.requestFocusInWindow();
+        } else {
+            // Second press: fire bet event, hide text field
+            if (betListener != null) {
+                betListener.actionPerformed(null);
+            }
+            isAwaitingBetAmount = false;
+            betPanel.setVisible(false);
+            betButton.setText(lastBetButtonText);
+        }
+    }
+    
+    public boolean isAwaitingBetAmount() {
+        return isAwaitingBetAmount;
     }
 } 
