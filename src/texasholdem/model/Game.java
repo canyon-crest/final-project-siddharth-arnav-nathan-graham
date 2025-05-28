@@ -80,7 +80,7 @@ public class Game {
      */
     public void startNewRound() {
         // Move the dealer button to the next player
-        dealerIndex = (dealerIndex + 1) % players.size();
+        dealerIndex = 1;
         
         // Reset game state for new round
         resetRound();
@@ -187,7 +187,7 @@ public class Game {
                 if (!player.hasFolded()) {
                     player.addChips(pot);
                     pot = 0;
-                    resetRound();
+                    startNewRound();
                     return true;
                 }
             }
@@ -277,8 +277,7 @@ public class Game {
         }
         
         // Can only bet if no one else has bet in this round
-        int maxBet = getMaxBet();
-        if (maxBet > 0) {
+        if (getMaxBet() > 0) {
             return false;
         }
         
@@ -320,8 +319,8 @@ public class Game {
         }
         
         // If the player doesn't have enough chips, go all-in
-        if (totalAmount > currentPlayer.getChips()) {
-            totalAmount = currentPlayer.getChips();
+        if (totalAmount > currentPlayer.getChips() + currentBet) {
+            totalAmount = currentPlayer.getChips() + currentBet;
             // Recalculate the actual raise amount
             amount = totalAmount - maxBet;
             if (amount <= 0) {

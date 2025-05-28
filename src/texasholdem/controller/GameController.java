@@ -138,7 +138,11 @@ public class GameController {
             playerView.setCards(player.getHoleCards(), showCards);
             playerView.setFolded(player.hasFolded());
             playerView.setCurrentPlayer(player == currentPlayer);
-            playerView.setDealer(player.isDealer());
+            if (i==0) {
+                playerView.setDealer(true);
+            } else {
+                playerView.setDealer(false);
+            }
             
             // Update chips display
             playerView.updateView();
