@@ -65,12 +65,11 @@ public class Game {
         this.minBet = minBet;
         
         // Create two players
-        for (String name : playerNames) {
-            players.add(new Player(name, startingChips));
-        }
+        players.add(new Player(playerNames[0], startingChips));
+        players.add(new ComputerPlayer(playerNames[1], startingChips, 60, 50));
         
         // Start with a random dealer
-        this.dealerIndex = (int) (Math.random() * 2);
+        this.dealerIndex = 0;
         
         // Initialize game state
         resetRound();
@@ -188,6 +187,7 @@ public class Game {
                 if (!player.hasFolded()) {
                     player.addChips(pot);
                     pot = 0;
+                    resetRound();
                     return true;
                 }
             }
@@ -310,34 +310,38 @@ public class Game {
         int currentBet = currentPlayer.getCurrentBet();
         int callAmount = maxBet - currentBet;
         
-        // Total amount to put in (call + raise)
-        int totalAmount = callAmount + amount;
+        // Total amount should be the current max bet plus the raise amount
+        int totalAmount = maxBet + amount;
         
         // Raise must be at least the minimum bet
         if (amount < minBet) {
             amount = minBet;
-            totalAmount = callAmount + amount;
+            totalAmount = maxBet + amount;
         }
         
         // If the player doesn't have enough chips, go all-in
         if (totalAmount > currentPlayer.getChips()) {
             totalAmount = currentPlayer.getChips();
-        }
-        
-        // If there's not enough to cover the call, can't raise
-        if (totalAmount <= callAmount) {
-            return false;
+            // Recalculate the actual raise amount
+            amount = totalAmount - maxBet;
+            if (amount <= 0) {
+                return false; // Can't raise with insufficient chips
+            }
         }
         
         // Take chips from player and add to pot
-        if (currentPlayer.removeChips(totalAmount)) {
-            pot += totalAmount;
-            currentPlayer.setCurrentBet(currentBet + totalAmount);
+        int chipsToRemove = totalAmount - currentBet; // Only remove the difference
+        if (currentPlayer.removeChips(chipsToRemove)) {
+            pot += chipsToRemove;
+            currentPlayer.setCurrentBet(totalAmount); // Set to the new total
             lastBettor = currentPlayer;
             lastRaiseAmount = amount;
             
             // Move to next player
             advanceToNextPlayer();
+            
+            // Check if betting round is complete
+            checkEndOfBettingRound();
             
             return true;
         }
@@ -349,9 +353,7 @@ public class Game {
      * Advances the game to the next player who hasn't folded.
      */
     private void advanceToNextPlayer() {
-        do {
-            currentPlayerIndex = (currentPlayerIndex + 1) % players.size();
-        } while (players.get(currentPlayerIndex).hasFolded() && getActivePlayerCount() > 1);
+        currentPlayerIndex = (currentPlayerIndex + 1) % players.size();
     }
     
     /**
