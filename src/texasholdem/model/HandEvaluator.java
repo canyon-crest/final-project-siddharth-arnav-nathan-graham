@@ -113,7 +113,8 @@ public class HandEvaluator {
         if (result != null) return result;
         
         // If nothing else, return high card
-        return new HandResult(HandRank.HIGH_CARD, allCards.subList(0, 5));
+        int numCards = Math.min(allCards.size(), 5);
+        return new HandResult(HandRank.HIGH_CARD, allCards.subList(0, numCards));
     }
     
     /**

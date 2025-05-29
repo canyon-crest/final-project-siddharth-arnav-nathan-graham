@@ -231,6 +231,9 @@ public class Game {
         int maxBet = getMaxBet();
         int amountToCall = maxBet - currentPlayer.getCurrentBet();
         
+        // Log the call action
+        System.out.println(currentPlayer.getName() + " is calling. Max bet: " + maxBet + ", Current bet: " + currentPlayer.getCurrentBet() + ", Amount to call: " + amountToCall);
+        
         // If the player doesn't have enough chips, go all-in
         if (amountToCall > currentPlayer.getChips()) {
             amountToCall = currentPlayer.getChips();
@@ -245,11 +248,14 @@ public class Game {
         currentPlayer.removeChips(amountToCall);
         pot += amountToCall;
         currentPlayer.setCurrentBet(currentPlayer.getCurrentBet() + amountToCall);
-        // Move to next player
-        advanceToNextPlayer();
         
-        // Check if betting round is over
+        // Check if betting round is over BEFORE advancing to next player
         checkEndOfBettingRound();
+        
+        // Only advance to next player if the round is not complete
+        if (!isBettingComplete()) {
+            advanceToNextPlayer();
+        }
         
         return true;
     }
@@ -374,19 +380,35 @@ public class Game {
      * @return true if betting is complete, false otherwise
      */
     private boolean isBettingComplete() {
+        int activePlayers = getActivePlayerCount();
+        int maxBet = getMaxBet();
+
+        // If heads-up, betting is complete when both active players have matched the highest bet
+        if (players.size() == 2 && activePlayers == 2) {
+            boolean allMatched = true;
+            for (Player player : players) {
+                if (!player.hasFolded() && player.getCurrentBet() != maxBet) {
+                    allMatched = false;
+                    break;
+                }
+            }
+            if (allMatched) {
+                return true;
+            }
+        }
+
         if (lastBettor == null) {
             // If no bet has been made, check if all players have acted
             return currentPlayerIndex == dealerIndex;
         }
-        
+
         // Check if all active players have matched the highest bet
-        int maxBet = getMaxBet();
         for (Player player : players) {
             if (!player.hasFolded() && player.getCurrentBet() != maxBet) {
                 return false;
             }
         }
-        
+
         // Check if all players have had a chance to act after the last bettor
         return players.get(currentPlayerIndex) == lastBettor;
     }
