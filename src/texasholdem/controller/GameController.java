@@ -133,7 +133,6 @@ public class GameController {
             Player player = players.get(i);
             PlayerView playerView = playerViews.get(i);
             
-            // Ensure PlayerView references the correct Player instance
             playerView.setPlayer(player);
             
             // Show cards for human, hide for AI unless showdown
