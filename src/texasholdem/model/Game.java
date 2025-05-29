@@ -231,7 +231,7 @@ public class Game {
         int maxBet = getMaxBet();
         int amountToCall = maxBet - currentPlayer.getCurrentBet();
         
-        // Log the call action
+        
         System.out.println(currentPlayer.getName() + " is calling. Max bet: " + maxBet + ", Current bet: " + currentPlayer.getCurrentBet() + ", Amount to call: " + amountToCall);
         
         // If the player doesn't have enough chips, go all-in
@@ -252,7 +252,7 @@ public class Game {
         // Check if betting round is over BEFORE advancing to next player
         checkEndOfBettingRound();
         
-        // Only advance to next player if the round is not complete
+        
         if (!isBettingComplete()) {
             advanceToNextPlayer();
         }
@@ -383,7 +383,7 @@ public class Game {
         int activePlayers = getActivePlayerCount();
         int maxBet = getMaxBet();
 
-        // If heads-up, betting is complete when both active players have matched the highest bet
+        
         if (players.size() == 2 && activePlayers == 2) {
             boolean allMatched = true;
             for (Player player : players) {

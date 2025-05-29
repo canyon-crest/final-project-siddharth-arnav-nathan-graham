@@ -251,7 +251,7 @@ public class GameController {
                 game.raise(amount);
             }
             updateGameView();
-            // After updating the view, if it's now the AI's turn, trigger the AI
+            
             Player currentPlayer = game.getCurrentPlayer();
             if (currentPlayer instanceof ComputerPlayer && game.getCurrentRound() != Game.BettingRound.SHOWDOWN) {
                 triggerAiTurn();
@@ -345,7 +345,7 @@ public class GameController {
         int maxBet = game.getMaxBet();
         int potSize = game.getPot();
         
-        // Log AI's decision
+        
         System.out.println("AI's turn. Current player: " + ai.getName() + ", Max bet: " + maxBet + ", Pot size: " + potSize);
         
         // Get AI's decision
